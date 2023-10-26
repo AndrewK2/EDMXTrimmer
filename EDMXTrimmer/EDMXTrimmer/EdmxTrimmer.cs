@@ -20,6 +20,7 @@ namespace EDMXTrimmer
         private XmlDocument _xmlDocument;
         private XmlNode _firstSchemaNode;
         private string ENTITYNAMESPACE;
+        private string ENTITYNAMESPACE_ALIAS;
         private const string TAG_SCHEMA = "Schema";
         private const string TAG_ENTITY_TYPE = "EntityType";
         private const string TAG_ENTITY_SET = "EntitySet";
@@ -31,6 +32,7 @@ namespace EDMXTrimmer
         private const string TAG_PARAMETER = "Parameter";
         private const string TAG_ENUM_TYPE = "EnumType";
         private const string TAG_ACTION_IMPORT = "ActionImport";
+        private const string ATTRIBUTE_ALIAS = "Alias";
         private const string ATTRIBUTE_NAMESPACE = "Namespace";
         private const string ATTRIBUTE_NAME = "Name";
         private const string ATTRIBUTE_TYPE = "Type";
@@ -80,6 +82,7 @@ namespace EDMXTrimmer
         {
             this._firstSchemaNode = this._xmlDocument.GetElementsByTagName(TAG_SCHEMA)[0];
             this.ENTITYNAMESPACE = this._firstSchemaNode.Attributes[ATTRIBUTE_NAMESPACE].Value + ".";
+            this.ENTITYNAMESPACE_ALIAS = this._firstSchemaNode.Attributes[ATTRIBUTE_ALIAS].Value + ".";
             
             var entitySets = this._xmlDocument.GetElementsByTagName(TAG_ENTITY_SET).Cast<XmlNode>().ToList();
             var entityTypes = this._xmlDocument.GetElementsByTagName(TAG_ENTITY_TYPE).Cast<XmlNode>().ToList();
@@ -197,7 +200,7 @@ namespace EDMXTrimmer
             // Remove entity not required (EntityType)
             var entityTypesKeep = entityTypes.Where(n => entityTypesFound.Contains(n.Attributes[ATTRIBUTE_NAME].Value)).ToList();
             entityTypes.Except(entityTypesKeep).ToList().ForEach(n => n.ParentNode.RemoveChild(n));
-
+            
             // Remove all Actions         
             this._xmlDocument.GetElementsByTagName(TAG_ACTION).Cast<XmlNode>()
                 .Where(action => !entityTypesFound.Any(entityType => action.ChildNodes.Cast<XmlNode>().
@@ -263,7 +266,7 @@ namespace EDMXTrimmer
                 .ForEach(n => n.ParentNode.RemoveChild(n));
 
             this._xmlDocument.Save(OutputFileName);
-
+            
         }
 
         private void RemovePrimaryAnnotations()
@@ -282,9 +285,16 @@ namespace EDMXTrimmer
                 .ForEach(n => n.ParentNode.RemoveChild(n));
         }
 
-        private bool EntityExists(XmlNode xmlNode, string entityType)
-        {
-            return xmlNode.Attributes[ATTRIBUTE_TYPE] == null ? false : Regex.IsMatch(xmlNode.Attributes[ATTRIBUTE_TYPE].Value, ENTITYNAMESPACE + entityType + "\\)?$");
+        private bool EntityExists(XmlNode xmlNode, string entityType) {
+            var typeValue = xmlNode.Attributes[ATTRIBUTE_TYPE]?.Value;
+
+            if(null == typeValue) {
+                return false;
+            }
+            if(!string.IsNullOrEmpty(ENTITYNAMESPACE_ALIAS) && Regex.IsMatch(typeValue, Regex.Escape(ENTITYNAMESPACE_ALIAS + entityType) + "\\)?$")) {
+                return true;
+            }
+            return Regex.IsMatch(typeValue, Regex.Escape(ENTITYNAMESPACE + entityType) + "\\)?$");
         }
     }
 }
